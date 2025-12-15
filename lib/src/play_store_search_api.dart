@@ -382,6 +382,35 @@ extension PlayStoreResults on PlayStoreSearchAPI {
         }
       }
 
+      // Pattern 2: Try bracket pattern ]]]," which appears in some Play Store variants
+      // This pattern is found in certain regional pages (e.g., Egypt) where the version
+      // is stored as ]]],"X.Y.Z",null,null...
+      const bracketPattern = ']]],"';
+      final regExp = RegExp(r'\]\]\],"(\d+\.\d+\.\d+)"');
+
+      for (var script in scripts) {
+        final scriptText = script.text;
+        if (scriptText.contains(bracketPattern)) {
+          final matches = regExp.allMatches(scriptText);
+          for (var match in matches) {
+            final storeVersion = match.group(1);
+            if (storeVersion != null && storeVersion.isNotEmpty) {
+              try {
+                final parsed = Version.parse(storeVersion);
+                if (debugLogging) {
+                  print(
+                      'upgrader: PlayStoreResults._parseVersionAlternative: found version="$storeVersion" with bracket pattern');
+                }
+                return parsed.toString();
+              } on FormatException {
+                // Not a valid version, try next match
+                continue;
+              }
+            }
+          }
+        }
+      }
+
       if (debugLogging) {
         print(
             'upgrader: PlayStoreResults._parseVersionAlternative: no valid version found in common patterns');
