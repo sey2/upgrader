@@ -26,8 +26,8 @@ class PlayStoreSearchAPI {
   /// Look up by id.
   Future<Document?> lookupById(String id,
       {String? country = 'US',
-      String? language = 'en',
-      bool useCacheBuster = true}) async {
+        String? language = 'en',
+        bool useCacheBuster = true}) async {
     assert(id.isNotEmpty);
     if (id.isEmpty) return null;
 
@@ -39,7 +39,7 @@ class PlayStoreSearchAPI {
 
     try {
       final response =
-          await client!.get(Uri.parse(url), headers: clientHeaders);
+      await client!.get(Uri.parse(url), headers: clientHeaders);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         if (debugLogging) {
           print(
@@ -66,8 +66,8 @@ class PlayStoreSearchAPI {
   /// Create a URL that points to the Play Store details for an app.
   String? lookupURLById(String id,
       {String? country = 'US',
-      String? language = 'en',
-      bool useCacheBuster = true}) {
+        String? language = 'en',
+        bool useCacheBuster = true}) {
     assert(id.isNotEmpty);
     if (id.isEmpty) return null;
 
@@ -134,10 +134,10 @@ extension PlayStoreResults on PlayStoreSearchAPI {
   /// The format in the description by default is like this: `[Minimum supported app version: 1.2.3]`, which
   /// returns the version `1.2.3`. If there is no match, it returns null.
   Version? minAppVersion(
-    Document response, {
-    String tagRegExpSource =
+      Document response, {
+        String tagRegExpSource =
         r'\[\Minimum supported app version\:[\s]*(?<version>[^\s]+)[\s]*\]',
-  }) {
+      }) {
     Version? version;
     try {
       final desc = description(response);
@@ -172,7 +172,7 @@ extension PlayStoreResults on PlayStoreSearchAPI {
     try {
       final sectionElements = response.getElementsByClassName('W4P4ne');
       final releaseNotesElement = sectionElements.firstWhere(
-          (elm) => elm.querySelector('.wSaTQd')!.text == 'What\'s New',
+              (elm) => elm.querySelector('.wSaTQd')!.text == 'What\'s New',
           orElse: () => sectionElements[0]);
 
       final rawReleaseNotes = releaseNotesElement
@@ -193,7 +193,7 @@ extension PlayStoreResults on PlayStoreSearchAPI {
   String? redesignedReleaseNotes(Document response) {
     try {
       final sectionElements =
-          response.querySelectorAll('[itemprop="description"]');
+      response.querySelectorAll('[itemprop="description"]');
 
       final rawReleaseNotes = sectionElements.last;
       final releaseNotes = multilineReleaseNotes(rawReleaseNotes);
@@ -226,7 +226,7 @@ extension PlayStoreResults on PlayStoreSearchAPI {
     try {
       final additionalInfoElements = response.getElementsByClassName('hAyfc');
       final versionElement = additionalInfoElements.firstWhere(
-        (elm) => elm.querySelector('.BgcNfc')!.text == 'Current Version',
+            (elm) => elm.querySelector('.BgcNfc')!.text == 'Current Version',
       );
       final storeVersion = versionElement.querySelector('.htlgb')!.text;
       // storeVersion might be: 'Varies with device', which is not a valid version.
@@ -249,9 +249,9 @@ extension PlayStoreResults on PlayStoreSearchAPI {
 
       final scripts = response.getElementsByTagName("script");
       final infoElements =
-          scripts.where((element) => element.text.contains(patternName));
+      scripts.where((element) => element.text.contains(patternName));
       final additionalInfoElements =
-          scripts.where((element) => element.text.contains(patternCallback));
+      scripts.where((element) => element.text.contains(patternCallback));
       final additionalInfoElementsFiltered = additionalInfoElements
           .where((element) => element.text.contains(patternVersion));
 
@@ -263,7 +263,7 @@ extension PlayStoreResults on PlayStoreSearchAPI {
               .substring(storeNameStartIndex)
               .indexOf(patternEndOfString);
       final storeName =
-          nameElement.substring(storeNameStartIndex, storeNameEndIndex);
+      nameElement.substring(storeNameStartIndex, storeNameEndIndex);
       final storeNameCleaned = storeName.replaceAll(r'\u0027', '\'');
 
       final versionElement = additionalInfoElementsFiltered
@@ -278,9 +278,6 @@ extension PlayStoreResults on PlayStoreSearchAPI {
               .indexOf(patternEndOfString);
       final storeVersion = versionElement.substring(
           storeVersionStartIndex, storeVersionEndIndex);
-
-      // storeVersion might be: 'Varies with device', which is not a valid version.
-      version = Version.parse(storeVersion).toString();
 
       if (debugLogging) {
         print(
@@ -312,19 +309,21 @@ extension PlayStoreResults on PlayStoreSearchAPI {
       if (debugLogging) {
         print('upgrader: PlayStoreResults.redesignedVersion exception: $e');
       }
+      // If the main parsing failed, try alternative pattern (for regional pages)
       version = _parseVersionAlternative(response, debugLogging);
     }
 
     return version;
   }
 
-  /// Alternative version parsing for regional Play Store pages (e.g., Korean, Bengali)
+  /// Alternative version parsing for regional Play Store pages (e.g., Korean, Bengali, Egypt)
   ///
   /// When the main parsing method fails on regional pages, this method tries multiple
   /// fallback patterns to extract version information from the Play Store JSON data.
   ///
   /// Patterns tried:
   /// 1. JSON key pattern: "XXX":[[["version" where XXX is a numeric key (common: 140-145)
+  /// 2. Bracket pattern: ]]],"version" which appears in some regional variants
   String? _parseVersionAlternative(Document response, bool debugLogging) {
     try {
       final scripts = response.getElementsByTagName("script");
@@ -346,7 +345,7 @@ extension PlayStoreResults on PlayStoreSearchAPI {
         const patternEndOfString = '"';
 
         final versionElements =
-            scripts.where((element) => element.text.contains(pattern));
+        scripts.where((element) => element.text.contains(pattern));
 
         if (versionElements.isNotEmpty) {
           final versionElement = versionElements.first.text;
@@ -361,7 +360,7 @@ extension PlayStoreResults on PlayStoreSearchAPI {
 
             if (versionEndIndex > versionStartIndex) {
               final storeVersion =
-                  versionElement.substring(versionStartIndex, versionEndIndex);
+              versionElement.substring(versionStartIndex, versionEndIndex);
 
               if (storeVersion.isNotEmpty) {
                 // Try to parse the version string
@@ -376,6 +375,35 @@ extension PlayStoreResults on PlayStoreSearchAPI {
                   // This key didn't have a valid version, try next key
                   continue;
                 }
+              }
+            }
+          }
+        }
+      }
+
+      // Pattern 2: Try bracket pattern ]]]," which appears in some Play Store variants
+      // This pattern is found in certain regional pages (e.g., Egypt) where the version
+      // is stored as ]]],"X.Y.Z",null,null...
+      const bracketPattern = ']]],"';
+      final regExp = RegExp(r'\]\]\],"(\d+\.\d+\.\d+)"');
+
+      for (var script in scripts) {
+        final scriptText = script.text;
+        if (scriptText.contains(bracketPattern)) {
+          final matches = regExp.allMatches(scriptText);
+          for (var match in matches) {
+            final storeVersion = match.group(1);
+            if (storeVersion != null && storeVersion.isNotEmpty) {
+              try {
+                final parsed = Version.parse(storeVersion);
+                if (debugLogging) {
+                  print(
+                      'upgrader: PlayStoreResults._parseVersionAlternative: found version="$storeVersion" with bracket pattern');
+                }
+                return parsed.toString();
+              } on FormatException {
+                // Not a valid version, try next match
+                continue;
               }
             }
           }
